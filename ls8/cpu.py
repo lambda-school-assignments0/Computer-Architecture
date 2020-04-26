@@ -2,12 +2,15 @@
 
 import sys
 
+ADD  = 0b10100000
+CALL = 0b01010000
 HLT  = 0b00000001
 LDI  = 0b10000010
 MUL  = 0b10100010
 POP  = 0b01000110
 PRN  = 0b01000111
 PUSH = 0b01000101
+RET  = 0b00010001
 
 class CPU:
     """Main CPU class."""
@@ -30,12 +33,15 @@ class CPU:
         }
         # Set up dispatch branch table
         self.dispatch = {
+            ADD:  self.add,
+            CALL: self.call,
             HLT:  self.hlt,
             LDI:  self.ldi,
             MUL:  self.mul,
             POP:  self.pop,
             PRN:  self.prn,
-            PUSH: self.push
+            PUSH: self.push,
+            RET:  self.ret
         }
 
 
@@ -76,16 +82,32 @@ class CPU:
             address += 1
 
     ### OPERATIONS ###
+    def add(self):
+        self.alu("ADD", self.ram_read(self.registers["PC"] + 1), self.ram_read(self.registers["PC"] + 2))
+        self.registers["PC"] += 3
+
+
     def alu(self, op, reg_a, reg_b):
         """ALU operations."""
 
         if op == "ADD":
             self.reg[reg_a] += self.reg[reg_b]
-        #elif op == "SUB": etc
+        elif op == "SUB":
+            self.reg[reg_a] -= self.reg[reg_b]
         elif op == "MUL":
             self.reg[reg_a] *= self.reg[reg_b]
         else:
             raise Exception("Unsupported ALU operation")
+
+
+    def call(self):
+        self.registers["SP"] -= 1
+        self.ram[self.registers["SP"]] = self.registers["PC"] + 2
+        self.registers["PC"] = self.reg[self.ram[self.registers["PC"] + 1]]
+
+
+    def hlt(self):
+        self.running = False
 
 
     def ldi(self):
@@ -103,6 +125,7 @@ class CPU:
         self.ram[self.registers["SP"]] = 0
         self.registers["SP"] += 1
         self.registers["PC"] += 2
+        return self.reg[self.ram[self.registers["PC"] - 1]]
 
 
     def prn(self):
@@ -116,8 +139,10 @@ class CPU:
         self.registers["PC"] += 2
 
 
-    def hlt(self):
-        self.running = False
+    def ret(self):
+        self.registers["PC"] = self.ram[self.registers["SP"]]
+        self.ram[self.registers["SP"]] = 0
+        self.registers["SP"] += 1
     ### END OF OPERATIONS ###
 
     def ram_read(self, address):
