@@ -6,18 +6,25 @@ ADD  = 0b10100000
 CALL = 0b01010000
 DIV  = 0b10100011
 HLT  = 0b00000001
+INC  = 0b01100101
+INTE = 0b01010010
+IRET = 0b00010011
+JMP  = 0b01010100
 LDI  = 0b10000010
 MUL  = 0b10100010
+NOP  = 0b00000000
 POP  = 0b01000110
 PRN  = 0b01000111
 PUSH = 0b01000101
 RET  = 0b00010001
+ST   = 0b10000100
 
 class CPU:
     """Main CPU class."""
 
     def __init__(self):
         """Construct a new CPU."""
+        self.interrupts = [0] * 8
         self.ram = [0] * 256
         self.reg = [0] * 8
         self.running = False
@@ -38,12 +45,18 @@ class CPU:
             CALL: self.call,
             DIV:  self.div,
             HLT:  self.hlt,
+            INC:  self.inc,
+            INTE:  self.inte,
+            IRET: self.iret,
+            JMP:  self.jmp,
             LDI:  self.ldi,
             MUL:  self.mul,
+            NOP:  self.nop,
             POP:  self.pop,
             PRN:  self.prn,
             PUSH: self.push,
-            RET:  self.ret
+            RET:  self.ret,
+            ST:   self.st
         }
 
 
@@ -123,14 +136,39 @@ class CPU:
         self.running = False
 
 
+    def inc(self):
+        # TODO
+        pass
+
+
+    def inte(self):
+        # TODO
+        pass
+
+
+    def iret(self):
+        # TODO
+        pass
+
+
+    def jmp(self):
+        self.registers["PC"] = self.ram[self.registers["PC" + 1]]
+
+
     def ldi(self):
         self.ram_write(self.ram_read(self.registers["PC"] + 1), self.ram_read(self.registers["PC"] + 2))
         self.registers["PC"] += 3
 
 
     def mul(self):
+        # Multiply the values in two registers together and store the result in registerA.
         self.alu("MUL", self.ram_read(self.registers["PC"] + 1), self.ram_read(self.registers["PC"] + 2))
         self.registers["PC"] += 3
+
+
+    def nop(self):
+        # No operation. Do nothing for this instruction.
+        self.registers["PC"] += 1
 
 
     def pop(self):
@@ -157,6 +195,12 @@ class CPU:
         self.registers["PC"] = self.ram[self.registers["SP"]]
         self.ram[self.registers["SP"]] = 0
         self.registers["SP"] += 1
+    
+    
+    def st(self):
+        self.reg[self.ram[self.registers["PC" + 1]]] = self.reg[self.ram[self.registers["PC" + 2]]]
+        self.registers["PC"] += 2
+    
     ### END OF OPERATIONS ###
 
     def ram_read(self, address):
