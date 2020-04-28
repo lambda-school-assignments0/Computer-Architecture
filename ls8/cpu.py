@@ -4,6 +4,7 @@ import sys
 
 ADD  = 0b10100000
 CALL = 0b01010000
+DIV  = 0b10100011
 HLT  = 0b00000001
 LDI  = 0b10000010
 MUL  = 0b10100010
@@ -35,6 +36,7 @@ class CPU:
         self.dispatch = {
             ADD:  self.add,
             CALL: self.call,
+            DIV:  self.div,
             HLT:  self.hlt,
             LDI:  self.ldi,
             MUL:  self.mul,
@@ -96,6 +98,12 @@ class CPU:
             self.reg[reg_a] -= self.reg[reg_b]
         elif op == "MUL":
             self.reg[reg_a] *= self.reg[reg_b]
+        elif op == "DIV":
+            if self.reg[reg_b] == 0:
+                print("Error: Cannot divide by 0!")
+                self.hlt()
+            else:
+                self.reg[reg_a] /= self.reg[reg_b]
         else:
             raise Exception("Unsupported ALU operation")
 
@@ -104,6 +112,11 @@ class CPU:
         self.registers["SP"] -= 1
         self.ram[self.registers["SP"]] = self.registers["PC"] + 2
         self.registers["PC"] = self.reg[self.ram[self.registers["PC"] + 1]]
+
+
+    def div(self):
+        self.alu("DIV", self.ram_read(self.registers["PC"] + 1), self.ram_read(self.registers["PC"] + 2))
+        self.registers["PC"] += 3
 
 
     def hlt(self):
@@ -122,7 +135,8 @@ class CPU:
 
     def pop(self):
         self.reg[self.ram[self.registers["PC"] + 1]] = self.ram[self.registers["SP"]]
-        self.ram[self.registers["SP"]] = 0
+        # No need to reset to 0 because push will overwrite later
+        # self.ram[self.registers["SP"]] = 0
         self.registers["SP"] += 1
         self.registers["PC"] += 2
         return self.reg[self.ram[self.registers["PC"] - 1]]
