@@ -2,6 +2,11 @@
 
 import sys
 
+# Registers
+IM   = 5 # R5 : Interrupt Mask
+IS   = 6 # R6 : Interrupt Status
+SP   = 7 # R7 : Stack Pointer
+# Operations
 ADD  = 0b10100000
 CALL = 0b01010000
 DIV  = 0b10100011
@@ -24,21 +29,25 @@ class CPU:
 
     def __init__(self):
         """Construct a new CPU."""
-        self.interrupts = [0] * 8
         self.ram = [0] * 256
-        self.reg = [0] * 8
         self.running = False
-        # Set up Registers
-        self.registers = {
-            "PC":  0,   # R0 : Program Counter
-            "IR":  0,   # R1 : Instruction Register
-            "MAR": 0,   # R2 : Memory Address Register
-            "MDR": 0,   # R3 : Memory Data Register
-            "FL":  0,   # R4 : Flags
-            "IM":  0,   # R5 : Interrupt Mask
-            "IS":  0,   # R6 : Interrupt Status
-            "SP":  0xF4 # R7 : Stack Pointer
-        }
+        # Set up internal registers
+        self.pc  = 0 # Program Counter (PC)
+        self.ir  = 0 # Instruction Register (IR)
+        self.mar = 0 # Memory Address Register (MAR)
+        self.mdr = 0 # Memory Data Register (MDR)
+        self.fl  = 0 # Flags (FL)
+        # Set up registers
+        self.reg = [
+            0,   # R0
+            0,   # R1
+            0,   # R2
+            0,   # R3
+            0,   # R4
+            0,   # R5 : Interrupt Mask (IM)
+            0,   # R6 : Interrupt Status (IS)
+            0xF4 # R7 : Stack Pointer (SP)
+        ]
         # Set up dispatch branch table
         self.dispatch = {
             ADD:  self.add,
@@ -46,7 +55,7 @@ class CPU:
             DIV:  self.div,
             HLT:  self.hlt,
             INC:  self.inc,
-            INTE:  self.inte,
+            INTE: self.inte,
             IRET: self.iret,
             JMP:  self.jmp,
             LDI:  self.ldi,
@@ -96,10 +105,10 @@ class CPU:
             self.ram[address] = instruction
             address += 1
 
-    ### OPERATIONS ###
+    ### START OF OPERATIONS ###
     def add(self):
-        self.alu("ADD", self.ram_read(self.registers["PC"] + 1), self.ram_read(self.registers["PC"] + 2))
-        self.registers["PC"] += 3
+        self.alu("ADD", self.ram_read(self.pc + 1), self.ram_read(self.pc + 2))
+        self.pc += 3
 
 
     def alu(self, op, reg_a, reg_b):
@@ -122,14 +131,14 @@ class CPU:
 
 
     def call(self):
-        self.registers["SP"] -= 1
-        self.ram[self.registers["SP"]] = self.registers["PC"] + 2
-        self.registers["PC"] = self.reg[self.ram[self.registers["PC"] + 1]]
+        self.reg[SP] -= 1
+        self.ram_write(self.reg[SP], self.pc + 2)
+        self.pc = self.reg[self.ram_read(self.pc + 1)]
 
 
     def div(self):
-        self.alu("DIV", self.ram_read(self.registers["PC"] + 1), self.ram_read(self.registers["PC"] + 2))
-        self.registers["PC"] += 3
+        self.alu("DIV", self.ram_read(self.pc + 1), self.ram_read(self.pc + 2))
+        self.pc += 3
 
 
     def hlt(self):
@@ -147,68 +156,109 @@ class CPU:
 
 
     def iret(self):
-        # TODO
+        # TODO: Return from an interrupt handler.
+        # Registers R6-R0 are popped off the stack in that order.
+        # The `FL` register is popped off the stack.
+        # The return address is popped off the stack and stored in `PC`.
+        # Interrupts are re-enabled.
         pass
 
 
     def jmp(self):
-        self.registers["PC"] = self.ram[self.registers["PC" + 1]]
+        # Jump to the address stored in the given register.
+        self.pc = self.ram_read(self.pc + 1)
 
 
     def ldi(self):
-        self.ram_write(self.ram_read(self.registers["PC"] + 1), self.ram_read(self.registers["PC"] + 2))
-        self.registers["PC"] += 3
+        self.reg[self.ram_read(self.pc + 1)] = self.ram_read(self.pc + 2)
+        self.pc += 3
 
 
     def mul(self):
         # Multiply the values in two registers together and store the result in registerA.
-        self.alu("MUL", self.ram_read(self.registers["PC"] + 1), self.ram_read(self.registers["PC"] + 2))
-        self.registers["PC"] += 3
+        self.alu("MUL", self.ram_read(self.pc + 1), self.ram_read(self.pc + 2))
+        self.pc += 3
 
 
     def nop(self):
         # No operation. Do nothing for this instruction.
-        self.registers["PC"] += 1
+        self.pc += 1
 
 
     def pop(self):
-        self.reg[self.ram[self.registers["PC"] + 1]] = self.ram[self.registers["SP"]]
+        self.reg[self.ram_read(self.pc + 1)] = self.ram_read(self.reg[SP])
         # No need to reset to 0 because push will overwrite later
-        # self.ram[self.registers["SP"]] = 0
-        self.registers["SP"] += 1
-        self.registers["PC"] += 2
-        return self.reg[self.ram[self.registers["PC"] - 1]]
+        # self.ram[self.reg["SP"]] = 0
+        self.reg[SP] += 1
+        self.pc += 2
+        return self.reg[self.ram_read(self.pc - 1)]
+
+
+    def pra(self):
+        """
+
+        `PRA register` pseudo-instruction
+
+        Print alpha character value stored in the given register.
+
+        Print to the console the ASCII character corresponding to the value in the
+        register.
+
+        Machine code:
+        ```
+        01001000 00000rrr
+        48 0r
+        ```
+
+        """
+
+        pass
 
 
     def prn(self):
-        print(self.reg[self.ram_read(self.registers["PC"] + 1)])
-        self.registers["PC"] += 2
+        print(self.reg[self.ram_read(self.pc + 1)])
+        self.pc += 2
 
 
     def push(self):
-        self.registers["SP"] -= 1
-        self.ram[self.registers["SP"]] = self.reg[self.ram[self.registers["PC"] + 1]]
-        self.registers["PC"] += 2
+        self.reg[SP] -= 1
+        self.ram_write(self.reg[SP], self.reg[self.ram_read(self.pc + 1)])
+        self.pc += 2
 
 
     def ret(self):
-        self.registers["PC"] = self.ram[self.registers["SP"]]
-        self.ram[self.registers["SP"]] = 0
-        self.registers["SP"] += 1
+        self.pc = self.ram_read(self.reg[SP])
+        self.ram_write(self.reg[SP], 0)
+        self.reg[SP] += 1
     
     
     def st(self):
-        self.reg[self.ram[self.registers["PC" + 1]]] = self.reg[self.ram[self.registers["PC" + 2]]]
-        self.registers["PC"] += 2
+        """
+
+        `ST registerA registerB`
+
+        Store value in registerB in the address stored in registerA.
+
+        This opcode writes to memory.
+
+        Machine code:
+        ```
+        10000100 00000aaa 00000bbb
+        84 0a 0b
+        ```
+
+        """
+        self.reg[self.ram_read(self.pc + 1)] = self.reg[self.ram_read(self.pc + 2)]
+        self.pc += 3
     
     ### END OF OPERATIONS ###
 
-    def ram_read(self, address):
-        return self.ram[address]
+    def ram_read(self, mar):
+        return self.ram[mar]
 
 
-    def ram_write(self, address, value):
-        self.reg[address] = value
+    def ram_write(self, mar, mdr):
+        self.ram[mar] = mdr
 
 
     def trace(self):
@@ -218,12 +268,12 @@ class CPU:
         """
 
         print(f"TRACE: %02X | %02X %02X %02X |" % (
-            self.registers["PC"],
+            self.pc,
             #self.fl,
             #self.ie,
-            self.ram_read(self.registers["PC"]),
-            self.ram_read(self.registers["PC"] + 1),
-            self.ram_read(self.registers["PC"] + 2)
+            self.ram_read(self.pc),
+            self.ram_read(self.pc + 1),
+            self.ram_read(self.pc + 2)
         ), end='')
 
         for i in range(8):
@@ -236,4 +286,4 @@ class CPU:
         self.running = True
 
         while self.running:
-            self.dispatch[self.ram[self.registers["PC"]]]()
+            self.dispatch[self.ram[self.pc]]()
